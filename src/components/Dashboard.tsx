@@ -23,11 +23,14 @@ import {
   Cpu,
   TestTube,
   Wifi,
-  WifiOff
+  WifiOff,
+  Send,
+  ExternalLink
 } from 'lucide-react';
 import { useAutomationData } from '../hooks/useAutomationData';
 import { ProcessedMessage } from '../types/automation';
 import { AITestPanel } from './AITestPanel';
+import { ConfigurationPanel } from './ConfigurationPanel';
 
 interface MetricCardProps {
   title: string;
@@ -147,11 +150,17 @@ const Dashboard: React.FC = () => {
   const [timeRange, setTimeRange] = useState('24h');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showAITest, setShowAITest] = useState(false);
+  const [showConfig, setShowConfig] = useState(false);
   const { metrics, recentMessages, isLoading, error, workflowActive, toggleWorkflow, refetch } = useAutomationData(timeRange);
 
-  // Check if we're using real data or fallback
-  const isUsingRealData = metrics && (metrics as any).dataSource !== 'mock';
-  const dataSource = (metrics as any)?.dataSource || 'mock';
+  // Check if we're using real data or simulation
+  const isUsingRealData = metrics && (metrics as any).dataSource?.includes('n8n');
+  const dataSource = (metrics as any)?.dataSource || 'simulation';
+
+  const handleConfigUpdate = () => {
+    // Force a complete page reload to pick up new environment variables
+    window.location.reload();
+  };
 
   const formatMetrics = () => {
     if (!metrics) return [];
@@ -259,10 +268,10 @@ const Dashboard: React.FC = () => {
               <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-xs ${
                 isUsingRealData 
                   ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
-                  : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                  : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
               }`}>
-                {isUsingRealData ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-                <span>{isUsingRealData ? 'Live Data' : 'Demo Mode'}</span>
+                {isUsingRealData ? <Wifi className="w-3 h-3" /> : <Activity className="w-3 h-3" />}
+                <span>{isUsingRealData ? 'Live Data' : 'Simulation Mode'}</span>
               </div>
               
               <div className="relative">
@@ -294,7 +303,11 @@ const Dashboard: React.FC = () => {
               >
                 <Power className="w-5 h-5" />
               </button>
-              <button className="p-2 text-gray-400 hover:text-white transition-colors">
+              <button 
+                onClick={() => setShowConfig(true)}
+                className="p-2 text-gray-400 hover:text-white transition-colors"
+                title="Configuration Settings"
+              >
                 <Settings className="w-5 h-5" />
               </button>
             </div>
@@ -305,14 +318,34 @@ const Dashboard: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Connection Status Banner */}
         {!isUsingRealData && (
-          <div className="mb-6 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
-            <div className="flex items-center space-x-3">
-              <WifiOff className="w-5 h-5 text-yellow-400" />
-              <div>
-                <p className="text-yellow-400 font-medium">Demo Mode Active</p>
-                <p className="text-yellow-300 text-sm">
-                  Dashboard is showing sample data. Update your .env file with real n8n credentials to see live data.
-                </p>
+          <div className="mb-6 bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <Activity className="w-5 h-5 text-blue-400" />
+                <div>
+                  <p className="text-blue-400 font-medium">Simulation Mode Active</p>
+                  <p className="text-blue-300 text-sm">
+                    Dashboard is showing simulated data with real-time variations. Configure your n8n credentials to connect to live data.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setShowConfig(true)}
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>Configure</span>
+                </button>
+                <a
+                  href="https://docs.n8n.io/api/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center space-x-1 px-3 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors text-sm"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  <span>n8n Docs</span>
+                </a>
               </div>
             </div>
           </div>
@@ -324,6 +357,13 @@ const Dashboard: React.FC = () => {
             <AITestPanel />
           </div>
         )}
+
+        {/* Configuration Panel */}
+        <ConfigurationPanel 
+          isOpen={showConfig}
+          onClose={() => setShowConfig(false)}
+          onConfigUpdate={handleConfigUpdate}
+        />
 
         {/* Controls */}
         <div className="flex items-center justify-between mb-8">
@@ -419,7 +459,9 @@ const Dashboard: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-gray-400 text-sm font-medium">AI Model</p>
-                  <p className="text-white text-lg font-bold">Gemma 3-12B-IT</p>
+                  <p className="text-white text-lg font-bold">
+                    {(import.meta.env.VITE_OPENROUTER_MODEL || 'google/gemma-3-12b-it').split('/')[1] || 'Gemma 3-12B-IT'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -476,36 +518,45 @@ const Dashboard: React.FC = () => {
               )}
             </div>
 
-            {/* Workflow Configuration */}
+            {/* Configuration Panel */}
             <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 mt-8">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-white">AI & Workflow Configuration</h3>
-                <Database className="w-5 h-5 text-gray-400" />
+                <h3 className="text-lg font-semibold text-white">Configuration & Status</h3>
+                <div className="flex items-center space-x-2">
+                  <Database className="w-5 h-5 text-gray-400" />
+                  <button
+                    onClick={() => setShowConfig(true)}
+                    className="p-1 text-gray-400 hover:text-white transition-colors"
+                    title="Edit Configuration"
+                  >
+                    <Settings className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-gray-700/50 rounded-lg p-4">
                   <p className="text-gray-400 text-sm">Workflow ID</p>
-                  <p className="text-white font-mono text-sm">{import.meta.env.VITE_N8N_WORKFLOW_ID}</p>
+                  <p className="text-white font-mono text-sm">{import.meta.env.VITE_N8N_WORKFLOW_ID || 'Not configured'}</p>
                 </div>
                 <div className="bg-gray-700/50 rounded-lg p-4">
                   <p className="text-gray-400 text-sm">WhatsApp Phone ID</p>
-                  <p className="text-white font-mono text-sm">{import.meta.env.VITE_WHATSAPP_PHONE_NUMBER_ID}</p>
+                  <p className="text-white font-mono text-sm">{import.meta.env.VITE_WHATSAPP_PHONE_NUMBER_ID || 'Not configured'}</p>
                 </div>
                 <div className="bg-gray-700/50 rounded-lg p-4">
                   <p className="text-gray-400 text-sm">AI Model</p>
-                  <p className="text-white text-sm">{import.meta.env.VITE_OPENROUTER_MODEL}</p>
-                </div>
-                <div className="bg-gray-700/50 rounded-lg p-4">
-                  <p className="text-gray-400 text-sm">Memory Type</p>
-                  <p className="text-white text-sm">Buffer Window</p>
-                </div>
-                <div className="bg-gray-700/50 rounded-lg p-4">
-                  <p className="text-gray-400 text-sm">OpenRouter Credential</p>
-                  <p className="text-white font-mono text-sm">{import.meta.env.VITE_OPENROUTER_CREDENTIAL_ID}</p>
+                  <p className="text-white text-sm">{import.meta.env.VITE_OPENROUTER_MODEL || 'google/gemma-3-12b-it'}</p>
                 </div>
                 <div className="bg-gray-700/50 rounded-lg p-4">
                   <p className="text-gray-400 text-sm">Data Source</p>
                   <p className="text-white text-sm">{dataSource}</p>
+                </div>
+                <div className="bg-gray-700/50 rounded-lg p-4">
+                  <p className="text-gray-400 text-sm">n8n Base URL</p>
+                  <p className="text-white text-sm">{import.meta.env.VITE_N8N_BASE_URL || 'Not configured'}</p>
+                </div>
+                <div className="bg-gray-700/50 rounded-lg p-4">
+                  <p className="text-gray-400 text-sm">OpenRouter API</p>
+                  <p className="text-white text-sm">{import.meta.env.VITE_OPENROUTER_API_KEY ? 'Configured' : 'Not configured'}</p>
                 </div>
               </div>
             </div>
